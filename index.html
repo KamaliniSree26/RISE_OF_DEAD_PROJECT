@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RISE OF DEAD - 3D Jungle Zombie Survival</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 3D WebGL Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Red Damage Screen Flash Vignette -->
+        <div id="damage-flash"></div>
+
+        <!-- CENTER: Crosshair with dynamic hitmarker -->
+        <div id="crosshair">
+            <div class="cross-line cross-h"></div>
+            <div class="cross-line cross-v"></div>
+            <div class="cross-dot"></div>
+            <div class="hit-indicator hit-tl"></div>
+            <div class="hit-indicator hit-tr"></div>
+            <div class="hit-indicator hit-bl"></div>
+            <div class="hit-indicator hit-br"></div>
+        </div>
+
+        <!-- Center Proximity Interaction Prompt -->
+        <div id="interaction-prompt" class="hidden">
+            <span class="key-badge">E</span> <span id="prompt-text">READ SURVIVOR NOTE & SOLVE PUZZLE</span>
+        </div>
+
+        <!-- ==================================================
+             TOP-LEFT: CIRCULAR NAVIGATION MAP (MANDATORY)
+             ================================================== -->
+        <div id="minimap-container">
+            <canvas id="minimap-canvas" width="190" height="190"></canvas>
+            <div id="minimap-legend">
+                <span class="legend-item"><span class="dot-legend dot-player"></span>YOU</span>
+                <span class="legend-item"><span class="dot-legend dot-zombie"></span>ZOMBIE</span>
+                <span class="legend-item"><span class="dot-legend dot-safe"></span>SAFE PLACE</span>
+                <span class="legend-item"><span class="dot-legend dot-key"></span>KEY</span>
+                <span class="legend-item"><span class="dot-legend dot-exit"></span>EXIT</span>
+            </div>
+        </div>
+
+        <!-- ==================================================
+             TOP-CENTER: LEVEL, OBJECTIVE, TIMER & BOSS BAR
+             ================================================== -->
+        <div class="hud-top-center">
+            <div class="hud-level-tag" id="hud-level-title">LEVEL 1: DEEP JUNGLE BASIN</div>
+            <div id="hud-objective">OBJECTIVE: REACH SAFE PLACE 1 (RANGER CABIN)</div>
+            <div id="hud-timer">⏱️ TIME LEFT: 05:00</div>
+            
+            <!-- Boss Health Bar (Appears when Main Zombie spawns) -->
+            <div id="boss-hud" class="hidden">
+                <div id="boss-title">MAIN ZOMBIE (MUTATED INFECTED)</div>
+                <div id="boss-health-bar">
+                    <div id="boss-health-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================================================
+             TOP-RIGHT: SAFE PLACES, KEYS & ZOMBIE KILLS
+             ================================================== -->
+        <div class="hud-top-right">
+            <div id="hud-safe-places" class="hud-panel" style="color: #00ff88; border-color: #00ff88;">🏕️ SAFE PLACES: 0/5</div>
+            <div id="hud-keys" class="hud-panel">🔑 KEYS: 0/5</div>
+            <div id="hud-kills" class="hud-panel">🧟 ZOMBIES: 0</div>
+        </div>
+
+        <!-- ==================================================
+             BOTTOM-LEFT: HEALTH & LIVES
+             ================================================== -->
+        <div class="hud-bottom-left">
+            <div id="hud-health-wrap" class="hud-panel">
+                <div class="health-meta">
+                    <span id="hud-health-text">HEALTH: 100</span>
+                </div>
+                <div class="health-bar-bg">
+                    <div id="health-bar-fill"></div>
+                </div>
+            </div>
+            <div id="hud-lives" class="hud-panel">❤️ LIVES: 3</div>
+        </div>
+
+        <!-- ==================================================
+             BOTTOM-RIGHT: WEAPON, AMMO & WEAPON SWITCHER
+             ================================================== -->
+        <div class="hud-bottom-right">
+            <!-- Weapon Slots Selector -->
+            <div id="hud-weapon-slots">
+                <div class="weapon-slot active" id="slot-pistol" data-slot="1">
+                    <span class="slot-num">1</span> PISTOL
+                </div>
+                <div class="weapon-slot locked" id="slot-shotgun" data-slot="2">
+                    <span class="slot-num">2</span> SHOTGUN 🔒
+                </div>
+                <div class="weapon-slot locked" id="slot-rifle" data-slot="3">
+                    <span class="slot-num">3</span> ASSAULT RIFLE 🔒
+                </div>
+            </div>
+
+            <!-- Active Ammo Counter -->
+            <div id="hud-ammo" class="hud-panel">AMMO: 12/60</div>
+            <div class="hud-hint">
+                <span>[CLICK / DBL-CLICK] SHOOT</span> &bull; 
+                <span>[R] RELOAD</span> &bull; 
+                <span>[1-3 / SCROLL] WEAPONS</span>
+            </div>
+        </div>
+
+        <!-- Top Notification Banner -->
+        <div id="touch-toast" class="hidden">OBJECTIVE UPDATED</div>
+
+        <!-- ==================================================
+             INTERACTIVE PUZZLE MODAL (CLUE -> PUZZLE -> REWARD)
+             ================================================== -->
+        <div id="puzzle-modal" class="modal-overlay hidden">
+            <div class="puzzle-card">
+                <div class="puzzle-header">
+                    <h2 id="puzzle-header-title">📋 SURVIVALIST LOCKBOX & CLUE</h2>
+                    <button id="btn-close-puzzle" class="btn-close-modal">&times;</button>
+                </div>
+                <div class="puzzle-body">
+                    <!-- Left: Clue Journal -->
+                    <div class="puzzle-clue-side">
+                        <div class="notebook-title" id="puzzle-modal-title">SURVIVOR FIELD JOURNAL</div>
+                        <p class="notebook-entry" id="puzzle-modal-entry">
+                            "If you're reading this, the infection overran the outpost.
+                            I locked the emergency escape key in this lockbox.
+                            To unlock it, enter the security code derived from our jungle survey posts:"
+                        </p>
+                        <div class="clue-box" id="clue-content">
+                            <!-- Dynamic per-safeplace clue content populated by game.js -->
+                            <div class="clue-item">🌿 1. North Ridge Tower: Code <strong class="clue-val">3</strong></div>
+                            <div class="clue-item">🐍 2. Serpent River Post: Code <strong class="clue-val">8</strong></div>
+                            <div class="clue-item">☀️ 3. Sun Monolith Clearing: Code <strong class="clue-val">1</strong></div>
+                            <div class="clue-item">🌳 4. Ancient Banyan Grove: Code <strong class="clue-val">5</strong></div>
+                        </div>
+                        <div class="notebook-footer" id="puzzle-modal-footer">
+                            &rArr; Sequence: [ 3 - 8 - 1 - 5 ]
+                        </div>
+                    </div>
+
+                    <!-- Right: Interactive Puzzle Mini-Games (Unique per Safe Place) -->
+                    <div class="puzzle-lock-side">
+                        <div class="lock-title" id="puzzle-game-title">INTERACTIVE LOCK INTERFACE</div>
+
+                        <!-- Mini-Game 1: Safe Place 1 - Tactical 3-Digit Safe Keypad -->
+                        <div id="game-view-1" class="puzzle-game-view">
+                            <div class="keypad-panel">
+                                <div class="keypad-screen">
+                                    <span class="keypad-label">SAFE PIN CODE:</span>
+                                    <div class="keypad-display" id="keypad-display">_ _ _</div>
+                                </div>
+                                <div class="keypad-grid">
+                                    <button class="btn-keypad" data-key="1">1</button>
+                                    <button class="btn-keypad" data-key="2">2</button>
+                                    <button class="btn-keypad" data-key="3">3</button>
+                                    <button class="btn-keypad" data-key="4">4</button>
+                                    <button class="btn-keypad" data-key="5">5</button>
+                                    <button class="btn-keypad" data-key="6">6</button>
+                                    <button class="btn-keypad" data-key="7">7</button>
+                                    <button class="btn-keypad" data-key="8">8</button>
+                                    <button class="btn-keypad" data-key="9">9</button>
+                                    <button class="btn-keypad keypad-clear" id="btn-keypad-clear">CLR</button>
+                                    <button class="btn-keypad" data-key="0">0</button>
+                                    <button class="btn-keypad keypad-backspace" id="btn-keypad-del">⌫</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini-Game 2: Safe Place 2 - Quick Channel Radio Tuner -->
+                        <div id="game-view-2" class="puzzle-game-view hidden">
+                            <div class="radio-tuner-panel">
+                                <div class="radio-screen">
+                                    <div class="radio-freq-readout" id="radio-freq-val">142.8 <span class="unit">MHz</span></div>
+                                    <div class="radio-band-readout" id="radio-band-val">AM (HIGH BAND)</div>
+                                </div>
+                                <div class="radio-channel-buttons">
+                                    <button class="btn-channel" data-ch="1" data-freq="98.5" data-band="FM">CH 1: 98.5 MHz [FM]</button>
+                                    <button class="btn-channel" data-ch="2" data-freq="120.4" data-band="FM">CH 2: 120.4 MHz [FM]</button>
+                                    <button class="btn-channel" data-ch="3" data-freq="142.8" data-band="AM">CH 3: 142.8 MHz [AM] ★ EMERGENCY</button>
+                                </div>
+                                <div class="radio-signal-wrap">
+                                    <div class="signal-label">SIGNAL RESONANCE: <span id="signal-percent">100%</span></div>
+                                    <div class="signal-bar-track">
+                                        <div id="signal-bar-fill" class="signal-bar-fill" style="width: 100%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini-Game 3: Safe Place 3 - 3 Ancient Elemental Rune Stones -->
+                        <div id="game-view-3" class="puzzle-game-view hidden">
+                            <div class="runes-panel">
+                                <div class="rune-slots-row">
+                                    <div class="rune-slot" id="rune-slot-0">?</div>
+                                    <div class="rune-slot" id="rune-slot-1">?</div>
+                                    <div class="rune-slot" id="rune-slot-2">?</div>
+                                </div>
+                                <div class="runes-grid-easy">
+                                    <button class="btn-rune" data-rune="solar"><span class="rune-icon">☀️</span> 1. SOLAR</button>
+                                    <button class="btn-rune" data-rune="serpent"><span class="rune-icon">🐍</span> 2. SERPENT</button>
+                                    <button class="btn-rune" data-rune="lunar"><span class="rune-icon">🌙</span> 3. LUNAR</button>
+                                </div>
+                                <button id="btn-reset-runes" class="btn-reset-puzzle">🔄 RESET RUNES</button>
+                            </div>
+                        </div>
+
+                        <!-- Mini-Game 4: Safe Place 4 - 3 Biohazard Power Circuit Breakers -->
+                        <div id="game-view-4" class="puzzle-game-view hidden">
+                            <div class="breakers-panel">
+                                <div class="breaker-row" data-breaker="0">
+                                    <span class="breaker-label">1. MAIN POWER</span>
+                                    <div class="breaker-led off" id="breaker-led-0"></div>
+                                    <button class="btn-breaker-toggle" id="btn-breaker-0">OFF</button>
+                                </div>
+                                <div class="breaker-row" data-breaker="1">
+                                    <span class="breaker-label">2. EXHAUST VENT</span>
+                                    <div class="breaker-led off" id="breaker-led-1"></div>
+                                    <button class="btn-breaker-toggle" id="btn-breaker-1">OFF</button>
+                                </div>
+                                <div class="breaker-row" data-breaker="2">
+                                    <span class="breaker-label">3. VAULT LOCK</span>
+                                    <div class="breaker-led off" id="breaker-led-2"></div>
+                                    <button class="btn-breaker-toggle" id="btn-breaker-2">OFF</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini-Game 5: Safe Place 5 - 3x3 Tactical Radar Sector Grid -->
+                        <div id="game-view-5" class="puzzle-game-view hidden">
+                            <div class="radar-panel">
+                                <div class="radar-status-bar">
+                                    <span>MARK 2 EVACUATION SECTORS (A-1, B-2)</span>
+                                    <span id="radar-selected-count">0 / 2</span>
+                                </div>
+                                <div class="radar-grid radar-grid-3x3" id="radar-grid-container"></div>
+                                <button id="btn-reset-radar" class="btn-reset-puzzle">🔄 CLEAR TARGETS</button>
+                            </div>
+                        </div>
+
+                        <div id="puzzle-feedback" class="puzzle-feedback">EXAMINE LOG & SOLVE THE PUZZLE</div>
+                        <button id="btn-unlock-cache" class="btn-primary btn-puzzle-submit" style="background:#00e676; color:#041408; font-weight:900;">🔓 UNLOCK CACHE & COLLECT KEY</button>
+                    </div>
+                </div>
+
+                <!-- Puzzle Reward Splash inside modal when solved -->
+                <div id="puzzle-reward-banner" class="puzzle-reward-wrap hidden">
+                    <div class="reward-title" id="puzzle-reward-title">🎉 PUZZLE SOLVED! REWARD UNLOCKED:</div>
+                    <div class="reward-items" id="puzzle-modal-rewards">
+                        <span class="reward-badge">💥 SHOTGUN UNLOCKED + 32 SHELLS</span>
+                        <span class="reward-badge">🔑 EMERGENCY KEY FOUND (+1 KEY)</span>
+                        <span class="reward-badge">❤️ FIRST AID KIT (+40 HP)</span>
+                    </div>
+                    <button id="btn-claim-reward" class="btn-primary" style="background:#00e676; color:#041008; margin-top:14px;">TAKE REWARD & RESUME ESCAPE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================================================
+             MODAL: LEVEL COMPLETE / WIN MODAL
+             ================================================== -->
+        <div id="level-win-modal" class="modal-overlay hidden">
+            <div class="modal-card win-card">
+                <div class="modal-title" style="color: #00ff88; text-shadow: 0 0 20px #00ff88;">🏆 ESCAPE SUCCESSFUL!</div>
+                <div class="modal-subtitle" id="win-level-name">LEVEL 1 COMPLETED</div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">TIME REMAINING</div>
+                        <div class="stat-val" id="win-time" style="color: #00e5ff;">02:34</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">ZOMBIES ELIMINATED</div>
+                        <div class="stat-val" id="win-kills" style="color: #ff3366;">14</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">KEYS COLLECTED</div>
+                        <div class="stat-val" id="win-keys" style="color: #ffd700;">5/5</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">WEAPONS DISCOVERED</div>
+                        <div class="stat-val" id="win-weapons" style="color: #00ff88;">PISTOL, SHOTGUN, RIFLE</div>
+                    </div>
+                </div>
+                <button id="btn-next-level" class="btn-primary" style="background: #00ff88; color: #08140c;">NEXT LEVEL &rarr;</button>
+            </div>
+        </div>
+
+        <!-- ==================================================
+             MODAL: FINAL GAME VICTORY (ALL LEVELS COMPLETE)
+             ================================================== -->
+        <div id="final-win-modal" class="modal-overlay hidden">
+            <div class="modal-card win-card" style="border-color:#ffd700; box-shadow:0 0 45px rgba(255,215,0,0.6);">
+                <div class="modal-title" style="color: #ffd700; text-shadow: 0 0 25px #ffd700;">🎖️ FINAL ESCAPE ACHIEVED!</div>
+                <div class="modal-subtitle">YOU CONQUERED ALL JUNGLE SECTORS AND SURVIVED THE HORDE!</div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">TOTAL ZOMBIES KILLED</div>
+                        <div class="stat-val" id="final-total-kills" style="color: #ff3366;">48</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">SURVIVAL STATUS</div>
+                        <div class="stat-val" style="color: #00ff88;">EXTRACTION COMPLETED</div>
+                    </div>
+                </div>
+                <button id="btn-restart-campaign" class="btn-primary" style="background:#ffd700; color:#1a1400;">PLAY CAMPAIGN AGAIN</button>
+            </div>
+        </div>
+
+        <!-- ==================================================
+             MODAL: GAME OVER MODAL
+             ================================================== -->
+        <div id="game-over-modal" class="modal-overlay hidden">
+            <div class="modal-card" style="border-color: #ff2222; box-shadow: 0 0 35px rgba(255, 34, 34, 0.5);">
+                <div class="modal-title" style="color: #ff2222; text-shadow: 0 0 15px #ff0000;">GAME OVER</div>
+                <div id="game-over-reason" class="modal-subtitle">YOU WERE INFECTED</div>
+                <div id="game-over-kills" class="modal-stat">ZOMBIES KILLED: 0</div>
+                <div id="game-over-keys" class="modal-stat" style="color: #ffd700;">KEYS COLLECTED: 0/5</div>
+                <button id="btn-restart-game" class="btn-primary btn-restart">RESTART LEVEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/three.min.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
